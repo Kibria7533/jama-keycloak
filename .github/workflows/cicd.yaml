@@ -50,23 +50,7 @@ jobs:
             fi
 
             echo "Restarting Keycloak service..."
-#             if [ ! -f "/etc/systemd/system/keycloak.service" ]; then
-#               echo "Keycloak service not found. Configuring it..."
-#               echo "[Unit]
-# Description=Keycloak Server
-# After=network.target
 
-# [Service]
-# User=ubuntu
-# ExecStart=/opt/keycloak/bin/standalone.sh -b 0.0.0.0
-# Restart=always
-
-# [Install]
-# WantedBy=multi-user.target" | sudo tee /etc/systemd/system/keycloak.service > /dev/null
-#               sudo systemctl daemon-reload
-#               sudo systemctl enable keycloak.service
-#             fi
-#             sudo systemctl restart keycloak.service
 
             echo "Final directory structure in /opt/keycloak:"
             ls -la /opt/keycloak
