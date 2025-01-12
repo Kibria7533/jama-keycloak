@@ -62,6 +62,6 @@ jobs:
             echo "Final directory structure in /opt/keycloak:"
             ls -la /opt/keycloak
 
-      - name: Clean Up Private Key
+      - name: Clean Up Private Keyw
         run: |
           rm -f private_key.pem
