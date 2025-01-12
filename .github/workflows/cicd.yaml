@@ -28,13 +28,10 @@ jobs:
           key: ${{ env.PRIVATE_SSH_KEY }}
           script: |
             if [ -d "/opt/keycloak" ]; then
-              echo "exists=true"
+              echo "::set-output name=exists::true"
             else
-              echo "exists=false"
+              echo "::set-output name=exists::false"
             fi
-        register-output: |
-          output=$(if [ -d "/opt/keycloak" ]; then echo true; else echo false; fi)
-          echo "::set-output name=exists::$output"
 
       - name: Deploy Keycloak (First Push)
         if: steps.check-existing.outputs.exists == 'false'
@@ -51,7 +48,7 @@ jobs:
             sudo mv /home/ubuntu/keycloak-26.0.7 /opt/keycloak
 
             # Restart Keycloak service
-            # sudo systemctl restart keycloak.service
+            #sudo systemctl restart keycloak.service
 
       - name: Update JARs (Subsequent Updates)
         if: steps.check-existing.outputs.exists == 'true'
@@ -65,4 +62,4 @@ jobs:
             scp -i <(echo "${{ env.PRIVATE_SSH_KEY }}") -r $GITHUB_WORKSPACE/keycloak-26.0.7/providers/*.jar ubuntu@${{ secrets.SERVER_PUBLIC_IP }}:/opt/keycloak/providers/
 
             # Restart Keycloak service
-            # sudo systemctl restart keycloak.service
+            #sudo systemctl restart keycloak.service
