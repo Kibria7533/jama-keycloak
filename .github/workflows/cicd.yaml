@@ -9,7 +9,6 @@ env:
   AWS_REGION: ap-south-1
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  PRIVATE_SSH_KEY: ${{ secrets.AWS_SSH_KEY }}
   SERVER_PUBLIC_IP: ${{ secrets.SERVER_PUBLIC_IP }}
 
 jobs:
@@ -19,19 +18,22 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
+      - name: Write Private SSH Key
+        run: |
+          echo "${{ secrets.AWS_SSH_KEY }}" > private_key.pem
+          chmod 600 private_key.pem
+
       - name: Transfer Files to EC2
-        env:
-          PRIVATE_SSH_KEY: ${{ secrets.AWS_SSH_KEY }}
         run: |
           echo "Transferring files to EC2 instance..."
-
-          # First deployment: Transfer entire directory
-          if ssh -o StrictHostKeyChecking=no -i <(echo "$PRIVATE_SSH_KEY") ubuntu@${{ secrets.SERVER_PUBLIC_IP }} "[ ! -d '/opt/keycloak' ]"; then
+          
+          # Check if /opt/keycloak exists on EC2
+          if ssh -o StrictHostKeyChecking=no -i private_key.pem ubuntu@${{ secrets.SERVER_PUBLIC_IP }} "[ ! -d '/opt/keycloak' ]"; then
             echo "Keycloak directory does not exist. Deploying full directory."
-            scp -o StrictHostKeyChecking=no -i <(echo "$PRIVATE_SSH_KEY") -r $GITHUB_WORKSPACE/keycloak-26.0.7 ubuntu@${{ secrets.SERVER_PUBLIC_IP }}:/home/ubuntu/keycloak-26.0.7
+            scp -o StrictHostKeyChecking=no -i private_key.pem -r $GITHUB_WORKSPACE/keycloak-26.0.7 ubuntu@${{ secrets.SERVER_PUBLIC_IP }}:/home/ubuntu/keycloak-26.0.7
           else
             echo "Keycloak directory exists. Updating providers only."
-            scp -o StrictHostKeyChecking=no -i <(echo "$PRIVATE_SSH_KEY") $GITHUB_WORKSPACE/keycloak-26.0.7/providers/*.jar ubuntu@${{ secrets.SERVER_PUBLIC_IP }}:/opt/keycloak/providers/
+            scp -o StrictHostKeyChecking=no -i private_key.pem $GITHUB_WORKSPACE/keycloak-26.0.7/providers/*.jar ubuntu@${{ secrets.SERVER_PUBLIC_IP }}:/opt/keycloak/providers/
           fi
 
       - name: Deploy Keycloak on EC2
@@ -39,18 +41,38 @@ jobs:
         with:
           host: ${{ env.SERVER_PUBLIC_IP }}
           username: ubuntu
-          key: ${{ env.PRIVATE_SSH_KEY }}
+          key: private_key.pem
           script: |-
             echo "Setting up Keycloak deployment..."
             
-            # If full directory was transferred, move it to the correct location
+            # Move the directory to the correct location if full deployment
             if [ -d "/home/ubuntu/keycloak-26.0.7" ]; then
               echo "Moving full deployment directory to /opt/keycloak..."
               sudo mv /home/ubuntu/keycloak-26.0.7 /opt/keycloak
             fi
 
             echo "Restarting Keycloak service..."
+            if [ ! -f "/etc/systemd/system/keycloak.service" ]; then
+              echo "Keycloak service not found. Configuring it..."
+              echo "[Unit]
+Description=Keycloak Server
+After=network.target
 
+[Service]
+User=ubuntu
+ExecStart=/opt/keycloak/bin/standalone.sh -b 0.0.0.0
+Restart=always
+
+[Install]
+WantedBy=multi-user.target" | sudo tee /etc/systemd/system/keycloak.service > /dev/null
+              sudo systemctl daemon-reload
+              sudo systemctl enable keycloak.service
+            fi
+            sudo systemctl restart keycloak.service
 
             echo "Final directory structure in /opt/keycloak:"
             ls -la /opt/keycloak
+
+      - name: Clean Up Private Key
+        run: |
+          rm -f private_key.pem
