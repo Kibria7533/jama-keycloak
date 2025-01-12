@@ -26,7 +26,7 @@ jobs:
           username: ubuntu
           key: ${{ env.PRIVATE_SSH_KEY }}
           script: |-
-            # Check if Keycloak is already deployed
+            echo "Checking if Keycloak is already deployed..."
             if [ -d "/opt/keycloak" ]; then
               echo "Keycloak exists. Updating JARs..."
               # Sync only the providers directory
@@ -35,10 +35,15 @@ jobs:
               echo "Keycloak does not exist. Deploying full folder..."
               # Copy the entire keycloak-26.0.7 folder
               scp -i <(echo "${PRIVATE_SSH_KEY}") -r $GITHUB_WORKSPACE/keycloak-26.0.7 ubuntu@${SERVER_PUBLIC_IP}:/home/ubuntu/keycloak-26.0.7
+              echo "Listing files in /home/ubuntu:"
+              ls -la /home/ubuntu
+
               # Move the folder to the deployment path
               sudo mv /home/ubuntu/keycloak-26.0.7 /opt/keycloak
             fi
 
-            # Restart Keycloak service
+            echo "Final directory structure in /home/ubuntu:"
+            ls -la /home/ubuntu
+
             echo "Restarting Keycloak service..."
             # sudo systemctl restart keycloak.service
