@@ -33,7 +33,7 @@ jobs:
             scp -o StrictHostKeyChecking=no -i private_key.pem -r $GITHUB_WORKSPACE/keycloak-26.0.7 ubuntu@${{ secrets.SERVER_PUBLIC_IP }}:/home/ubuntu/keycloak-26.0.7
           else
             echo "Keycloak directory exists. Updating providers only."
-            scp -o StrictHostKeyChecking=no -i private_key.pem $GITHUB_WORKSPACE/keycloak-26.0.7/providers/*.jar ubuntu@${{ secrets.SERVER_PUBLIC_IP }}:/opt/keycloak/providers/
+            scp -o StrictHostKeyChecking=no -i private_key.pem $GITHUB_WORKSPACE/keycloak-26.0.7/providers/*.jar ubuntu@${{ secrets.SERVER_PUBLIC_IP }}:/home/ubuntu/providers/
           fi
 
       - name: Deploy Keycloak on EC2
@@ -45,13 +45,23 @@ jobs:
           script: |-
             echo "Setting up Keycloak deployment..."
             
-            # Move the directory to the correct location if full deployment
+            # If full directory was transferred, move it to the correct location
             if [ -d "/home/ubuntu/keycloak-26.0.7" ]; then
               echo "Moving full deployment directory to /opt/keycloak..."
               sudo mv /home/ubuntu/keycloak-26.0.7 /opt/keycloak
             fi
 
- 
+            # If providers were transferred, move them to the correct location
+            if [ -d "/home/ubuntu/providers" ]; then
+              echo "Updating providers directory..."
+              sudo mv /home/ubuntu/providers/*.jar /opt/keycloak/providers/
+            fi
+
+            echo "Restarting Keycloak service..."
+
+            echo "Final directory structure in /opt/keycloak:"
+            ls -la /opt/keycloak
+
       - name: Clean Up Private Key
         run: |
           rm -f private_key.pem
