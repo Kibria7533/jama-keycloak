@@ -13,7 +13,7 @@ mkdir -p $LOG_DIR
 # Check if Keycloak is already running
 if ! pgrep -f "keycloak.*org.jboss" > /dev/null; then
     echo "Starting Keycloak..."
-    nohup $KEYCLOAK_DIR/bin/kc.sh start --hostname=$(hostname -f) > $LOG_DIR/keycloak.log 2>&1 &
+    nohup $KEYCLOAK_DIR/bin/kc.sh start-dev --hostname=$(hostname -f) > $LOG_DIR/keycloak.log 2>&1 &
     sleep 5  # Give some time for Keycloak to initialize
     if pgrep -f "keycloak.*org.jboss" > /dev/null; then
         echo "Keycloak started successfully."
