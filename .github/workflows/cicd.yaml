@@ -37,6 +37,7 @@ jobs:
             echo "Copying files to the EC2 instance..."
             # Sync the entire keycloak-26.0.7 directory if it's a new deployment
             if [ ! "$(ls -A /opt/keycloak)" ]; then
+              pwd
               scp -i <(echo "${PRIVATE_SSH_KEY}") -r $GITHUB_WORKSPACE/keycloak-26.0.7 ubuntu@${SERVER_PUBLIC_IP}:/opt/keycloak/
             else
               # Only update the providers directory if Keycloak is already deployed
