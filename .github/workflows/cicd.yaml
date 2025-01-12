@@ -19,47 +19,26 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Check for Existing Deployment
-        id: check-existing
+      - name: Deploy or Update Keycloak
         uses: appleboy/ssh-action@master
         with:
           host: ${{ env.SERVER_PUBLIC_IP }}
           username: ubuntu
           key: ${{ env.PRIVATE_SSH_KEY }}
-          script: |
+          script: |-
+            # Check if Keycloak is already deployed
             if [ -d "/opt/keycloak" ]; then
-              echo "EXISTS=true" >> $GITHUB_ENV
+              echo "Keycloak exists. Updating JARs..."
+              # Sync only the providers directory
+              scp -i <(echo "${PRIVATE_SSH_KEY}") -r $GITHUB_WORKSPACE/keycloak-26.0.7/providers/*.jar ubuntu@${SERVER_PUBLIC_IP}:/opt/keycloak/providers/
             else
-              echo "EXISTS=false" >> $GITHUB_ENV
+              echo "Keycloak does not exist. Deploying full folder..."
+              # Copy the entire keycloak-26.0.7 folder
+              scp -i <(echo "${PRIVATE_SSH_KEY}") -r $GITHUB_WORKSPACE/keycloak-26.0.7 ubuntu@${SERVER_PUBLIC_IP}:/home/ubuntu/keycloak-26.0.7
+              # Move the folder to the deployment path
+              sudo mv /home/ubuntu/keycloak-26.0.7 /opt/keycloak
             fi
 
-      - name: Deploy Keycloak (First Push)
-        if: env.EXISTS == 'false'
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ env.SERVER_PUBLIC_IP }}
-          username: ubuntu
-          key: ${{ env.PRIVATE_SSH_KEY }}
-          script: |-
-            # Copy the entire keycloak-26.0.7 folder
-            scp -i <(echo "${{ env.PRIVATE_SSH_KEY }}") -r $GITHUB_WORKSPACE/keycloak-26.0.7 ubuntu@${{ secrets.SERVER_PUBLIC_IP }}:/home/ubuntu/keycloak-26.0.7
-
-            # Move Keycloak to the correct directory
-            sudo mv /home/ubuntu/keycloak-26.0.7 /opt/keycloak
-
             # Restart Keycloak service
-            sudo systemctl restart keycloak.service
-
-      - name: Update JARs (Subsequent Updates)
-        if: env.EXISTS == 'true'
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ env.SERVER_PUBLIC_IP }}
-          username: ubuntu
-          key: ${{ env.PRIVATE_SSH_KEY }}
-          script: |-
-            # Sync only the providers directory
-            scp -i <(echo "${{ env.PRIVATE_SSH_KEY }}") -r $GITHUB_WORKSPACE/keycloak-26.0.7/providers/*.jar ubuntu@${{ secrets.SERVER_PUBLIC_IP }}:/opt/keycloak/providers/
-
-            # Restart Keycloak service
-            sudo systemctl restart keycloak.service
+            echo "Restarting Keycloak service..."
+            # sudo systemctl restart keycloak.service
