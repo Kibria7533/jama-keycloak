@@ -28,13 +28,16 @@ jobs:
           key: ${{ env.PRIVATE_SSH_KEY }}
           script: |
             if [ -d "/opt/keycloak" ]; then
-              echo "exists=true" >> $GITHUB_ENV
+              echo "exists=true"
             else
-              echo "exists=false" >> $GITHUB_ENV
+              echo "exists=false"
             fi
+        register-output: |
+          output=$(if [ -d "/opt/keycloak" ]; then echo true; else echo false; fi)
+          echo "::set-output name=exists::$output"
 
       - name: Deploy Keycloak (First Push)
-        if: env.exists == 'false'
+        if: steps.check-existing.outputs.exists == 'false'
         uses: appleboy/ssh-action@master
         with:
           host: ${{ env.SERVER_PUBLIC_IP }}
@@ -51,7 +54,7 @@ jobs:
             # sudo systemctl restart keycloak.service
 
       - name: Update JARs (Subsequent Updates)
-        if: env.exists == 'true'
+        if: steps.check-existing.outputs.exists == 'true'
         uses: appleboy/ssh-action@master
         with:
           host: ${{ env.SERVER_PUBLIC_IP }}
