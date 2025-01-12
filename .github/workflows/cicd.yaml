@@ -1,8 +1,10 @@
-name: Deploy to AWS
+name: Deploy Keycloak JARs to EC2
+
 on:
   push:
     branches:
       - "main"
+
 env:
   AWS_REGION: ap-south-1
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
@@ -14,18 +16,50 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v3
-      - name: Deploy keycloak to EC2
-        env:
-          AWS_DEFAULT_REGION: ap-south-1
+
+      - name: Check for Existing Deployment
+        id: check-existing
         uses: appleboy/ssh-action@master
         with:
           host: ${{ env.SERVER_PUBLIC_IP }}
           username: ubuntu
           key: ${{ env.PRIVATE_SSH_KEY }}
-          envs: PRIVATE_SSH_KEY,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_DEFAULT_REGION,AWS_REGION
+          script: |
+            if [ -d "/opt/keycloak" ]; then
+              echo "exists=true" >> $GITHUB_ENV
+            else
+              echo "exists=false" >> $GITHUB_ENV
+            fi
+
+      - name: Deploy Keycloak (First Push)
+        if: env.exists == 'false'
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ env.SERVER_PUBLIC_IP }}
+          username: ubuntu
+          key: ${{ env.PRIVATE_SSH_KEY }}
           script: |-
-            sudo apt update
-            pwd
-            
+            # Copy the entire keycloak-26.0.7 folder
+            scp -i <(echo "${{ env.PRIVATE_SSH_KEY }}") -r $GITHUB_WORKSPACE/keycloak-26.0.7 ubuntu@${{ secrets.SERVER_PUBLIC_IP }}:/home/ubuntu/keycloak-26.0.7
+
+            # Move Keycloak to the correct directory
+            sudo mv /home/ubuntu/keycloak-26.0.7 /opt/keycloak
+
+            # Restart Keycloak service
+            # sudo systemctl restart keycloak.service
+
+      - name: Update JARs (Subsequent Updates)
+        if: env.exists == 'true'
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ env.SERVER_PUBLIC_IP }}
+          username: ubuntu
+          key: ${{ env.PRIVATE_SSH_KEY }}
+          script: |-
+            # Sync only the providers directory
+            scp -i <(echo "${{ env.PRIVATE_SSH_KEY }}") -r $GITHUB_WORKSPACE/keycloak-26.0.7/providers/*.jar ubuntu@${{ secrets.SERVER_PUBLIC_IP }}:/opt/keycloak/providers/
+
+            # Restart Keycloak service
+            # sudo systemctl restart keycloak.service
